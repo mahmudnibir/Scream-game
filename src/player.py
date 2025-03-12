@@ -5,9 +5,16 @@ from src.sprite_manager import SpriteManager, PlayerState
 
 class Player:
     def __init__(self, x, y):
-        self.rect = pygame.Rect(x, y, PLAYER_WIDTH, PLAYER_HEIGHT)
         self.sprite_manager = SpriteManager()
         self.sprite_manager.load_sprite_sheets()
+        
+        # Get the dimensions from the first idle frame
+        sprite = self.sprite_manager.sprites["idle"][0]
+        self.width = sprite.get_width()
+        self.height = sprite.get_height()
+        
+        # Create rect with sprite dimensions
+        self.rect = pygame.Rect(x, y, self.width, self.height)
         
         # Movement variables
         self.velocity_x = 0
@@ -138,7 +145,10 @@ class Player:
     def draw(self, surface):
         """Draw the player on the surface"""
         sprite = self.sprite_manager.get_current_frame()
-        surface.blit(sprite, self.rect)
+        # Center the sprite on the collision rect
+        draw_x = self.rect.x - (sprite.get_width() - self.rect.width) // 2
+        draw_y = self.rect.y - (sprite.get_height() - self.rect.height) // 2
+        surface.blit(sprite, (draw_x, draw_y))
         
         if SHOW_HITBOXES:
             pygame.draw.rect(surface, RED, self.rect, 2)

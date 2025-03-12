@@ -11,7 +11,15 @@ class Game:
         pygame.init()
         pygame.display.set_caption(TITLE)
         
-        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
+        # Make window resizable
+        self.screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.RESIZABLE)
+        self.current_width = WINDOW_WIDTH
+        self.current_height = WINDOW_HEIGHT
+        self.scale_factor = 1.0
+        
+        # Create a virtual surface for the game
+        self.virtual_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        
         self.clock = pygame.time.Clock()
         self.running = True
         
@@ -33,11 +41,12 @@ class Game:
         # Load background
         try:
             self.background = pygame.image.load("assets/images/background.png").convert()
-            self.background = pygame.transform.scale(self.background, (WINDOW_WIDTH, WINDOW_HEIGHT))
+            self.original_background = self.background  # Keep original for proper scaling
         except pygame.error:
             print("Warning: Could not load background image. Using solid color.")
             self.background = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
             self.background.fill((50, 50, 100))
+            self.original_background = self.background.copy()
             
     def handle_events(self):
         """Process all game events"""
@@ -45,6 +54,27 @@ class Game:
             if event.type == pygame.QUIT:
                 self.running = False
                 return
+                
+            # Handle window resize
+            elif event.type == pygame.VIDEORESIZE:
+                self.current_width = event.w
+                self.current_height = event.h
+                self.screen = pygame.display.set_mode((self.current_width, self.current_height), pygame.RESIZABLE)
+                self.scale_factor = min(self.current_width / WINDOW_WIDTH, self.current_height / WINDOW_HEIGHT)
+                # Scale background properly
+                self.background = pygame.transform.scale(self.original_background, (self.current_width, self.current_height))
+                
+            # Scale mouse position for UI interaction
+            elif event.type in (pygame.MOUSEBUTTONDOWN, pygame.MOUSEMOTION):
+                # Calculate the game view position
+                x_offset = (self.current_width - WINDOW_WIDTH * self.scale_factor) // 2
+                y_offset = (self.current_height - WINDOW_HEIGHT * self.scale_factor) // 2
+                
+                # Adjust mouse position to virtual coordinates
+                event.pos = (
+                    int((event.pos[0] - x_offset) / self.scale_factor),
+                    int((event.pos[1] - y_offset) / self.scale_factor)
+                )
                 
             # Let the state manager handle the event first
             if self.state_manager.handle_event(event):
@@ -99,27 +129,41 @@ class Game:
             
     def draw(self):
         """Draw the game screen"""
-        # Draw background
+        # Clear both surfaces
+        self.screen.fill((0, 0, 0))
+        self.virtual_surface.fill((0, 0, 0))
+        
+        # Draw background (scaled to actual window size)
         self.screen.blit(self.background, (0, 0))
         
         current_state = self.state_manager.state
         
-        # Draw level and player during gameplay
+        # Draw game elements on virtual surface
         if current_state in [GameState.PLAYING, GameState.PAUSED]:
             current_level = self.level_manager.get_current_level()
-            current_level.draw(self.screen)
-            self.player.draw(self.screen)
+            current_level.draw(self.virtual_surface)
+            self.player.draw(self.virtual_surface)
             
         # Draw sound debug info if enabled
         if SHOW_SOUND_DEBUG and current_state in [GameState.PLAYING, GameState.CALIBRATING]:
-            self._draw_sound_debug()
+            self._draw_sound_debug(self.virtual_surface)
             
         # Draw UI elements
-        self.state_manager.draw(self.screen)
+        self.state_manager.draw(self.virtual_surface)
+        
+        # Scale virtual surface to fit the window
+        scaled_surface = pygame.transform.scale(self.virtual_surface,
+                                              (int(WINDOW_WIDTH * self.scale_factor),
+                                               int(WINDOW_HEIGHT * self.scale_factor)))
+        
+        # Center the scaled surface on screen
+        x_offset = (self.current_width - scaled_surface.get_width()) // 2
+        y_offset = (self.current_height - scaled_surface.get_height()) // 2
+        self.screen.blit(scaled_surface, (x_offset, y_offset))
         
         pygame.display.flip()
         
-    def _draw_sound_debug(self):
+    def _draw_sound_debug(self, surface):
         """Draw sound debug information"""
         intensity = self.sound_processor.get_current_intensity()
         avg_intensity = self.sound_processor.get_average_intensity()
@@ -131,12 +175,12 @@ class Game:
         y = WINDOW_HEIGHT - 120
         
         # Current intensity
-        pygame.draw.rect(self.screen, RED,
+        pygame.draw.rect(surface, RED,
                         (x, y + bar_height * (1 - intensity),
                          bar_width, bar_height * intensity))
                          
         # Average intensity
-        pygame.draw.rect(self.screen, BLUE,
+        pygame.draw.rect(surface, BLUE,
                         (x - 30, y + bar_height * (1 - avg_intensity),
                          bar_width, bar_height * avg_intensity))
                          
@@ -145,7 +189,7 @@ class Game:
                                (JUMP_THRESHOLD, YELLOW),
                                (DASH_THRESHOLD, RED)]:
             y_pos = y + bar_height * (1 - threshold)
-            pygame.draw.line(self.screen, color,
+            pygame.draw.line(surface, color,
                            (x - 40, y_pos),
                            (x + bar_width + 10, y_pos), 2)
                            
