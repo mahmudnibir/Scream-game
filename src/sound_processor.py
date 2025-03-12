@@ -17,10 +17,16 @@ class SoundProcessor:
         self.frequency_peaks = []
         
         # Thresholds (can be calibrated)
-        self.noise_floor = 0.03
-        self.walk_threshold = 0.06
+        self.noise_floor = 0.05  # Increased noise floor
+        self.walk_threshold = 0.1  # Increased walk threshold
         self.jump_threshold = 0.2
         self.dash_threshold = 0.15
+        
+        # Debounce settings
+        self.last_action_time = 0
+        self.action_cooldown = 0.1  # Seconds between actions
+        self.sustained_threshold = 0.05  # How long sound must be sustained
+        self.action_start_time = 0
         
         # Frequency ranges for different actions
         self.whistle_range = (1000, 3000)  # Hz
@@ -44,8 +50,9 @@ class SoundProcessor:
             print(f"Status: {status}")
             return
             
-        # Calculate current intensity
-        self.current_intensity = np.linalg.norm(indata) / np.sqrt(len(indata))
+        # Calculate current intensity with smoothing
+        new_intensity = np.linalg.norm(indata) / np.sqrt(len(indata))
+        self.current_intensity = self.current_intensity * 0.7 + new_intensity * 0.3  # Smoothing
         self.intensity_history.append(self.current_intensity)
         
         # Perform FFT for frequency analysis
@@ -82,6 +89,25 @@ class SoundProcessor:
 
     def get_action(self):
         """Determine the current action based on sound input"""
+        current_time = time.time()
+        
+        # Enforce cooldown between actions
+        if current_time - self.last_action_time < self.action_cooldown:
+            return "none"
+            
+        # Check if sound is sustained enough
+        if self.current_intensity > self.noise_floor:
+            if self.action_start_time == 0:
+                self.action_start_time = current_time
+            elif current_time - self.action_start_time < self.sustained_threshold:
+                return "none"
+        else:
+            self.action_start_time = 0
+            return "none"
+            
+        # Reset cooldown timer
+        self.last_action_time = current_time
+            
         if self.current_intensity <= self.noise_floor:
             return "none"
             
@@ -102,7 +128,10 @@ class SoundProcessor:
         
         # Check for walk (talking)
         if self.current_intensity >= self.walk_threshold:
-            return "walk"
+            # Additional check for sustained sound
+            if len(self.intensity_history) >= 3:
+                if all(i >= self.walk_threshold for i in list(self.intensity_history)[-3:]):
+                    return "walk"
             
         return "none"
 
