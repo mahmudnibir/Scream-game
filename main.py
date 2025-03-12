@@ -152,7 +152,7 @@ class Game:
     def cleanup(self):
         """Clean up resources"""
         self.sound_processor.cleanup()
-        pygame.quit()
+    pygame.quit()
         
     def game_loop(self):
         """Main game loop"""
@@ -164,7 +164,7 @@ class Game:
                 self.clock.tick(FPS)
         finally:
             self.cleanup()
-            
+
 if __name__ == "__main__":
     game = Game()
     game.game_loop()
