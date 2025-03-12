@@ -15,6 +15,7 @@ RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 GRAY = (128, 128, 128)
+Yellow = (158, 158, 128)
 
 # Player settings
 PLAYER_WIDTH = 50
