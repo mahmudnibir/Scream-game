@@ -1,0 +1,5 @@
+pygame==2.5.2
+numpy==1.24.3
+sounddevice==0.4.6
+scipy==1.11.3
+pillow==10.0.0 

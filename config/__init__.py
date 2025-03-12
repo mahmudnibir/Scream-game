@@ -1,0 +1,3 @@
+"""
+Scream Game configuration package
+""" 

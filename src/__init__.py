@@ -1,0 +1,3 @@
+"""
+Scream Game source package
+""" 
